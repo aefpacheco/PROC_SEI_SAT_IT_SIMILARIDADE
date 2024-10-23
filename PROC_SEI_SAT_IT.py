@@ -1,14 +1,14 @@
 import psycopg2
 import pandas as pd
-from datetime import datetime, timedelta
-import numpy as np
+#from datetime import datetime, timedelta
+#import numpy as np
 import re
 import nltk
-import pickle
+#import pickle
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.cluster import AgglomerativeClustering
+#from sklearn.cluster import AgglomerativeClustering
 
 nltk.download('stopwords')
 
