@@ -33,8 +33,12 @@ FROM "stage"."PRODATA_IT_TEXTO"
 dados = pd.read_sql(query, conn)
 
 # Limpeza dos textos usando expressões regulares
-dados['TEXTO'] = dados['TEXTO'].str.replace(r'\W|\s+[a-zA-Z]\s+|\^[a-zA-Z]\s+', ' ', regex=True)
-dados['TEXTO'] = dados['TEXTO'].str.replace(r'^(.*)SOLICITANTE', '', flags=re.I, regex=True).str.lower()
+dados['TEXTO'] = dados['TEXTO'].str.lower()
+dados['TEXTO'] = dados['TEXTO'].str.replace(r'\W+', ' ', regex=True, flags=re.I)
+dados['TEXTO'] = dados['TEXTO'].str.replace(r'\s+', ' ', regex=True, flags=re.I)
+dados['TEXTO'] = dados['TEXTO'].str.replace(r'\s+[a-z]\s+', ' ', regex=True, flags=re.I)
+dados['TEXTO'] = dados['TEXTO'].str.replace(r'^[a-z0-9]\s+', '', regex=True, flags=re.I)
+dados['TEXTO'] = dados['TEXTO'].str.replace(r'^(.*)SOLICITANTE', '', regex=True, flags=re.I)
 
 tfidf_vectorizer = TfidfVectorizer(stop_words=stopwords.words('portuguese'))
 tfidf_matrix = tfidf_vectorizer.fit_transform(dados['TEXTO'])
