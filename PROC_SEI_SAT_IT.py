@@ -8,6 +8,7 @@ import nltk
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from psycopg2.extras import execute_values
 #from sklearn.cluster import AgglomerativeClustering
 
 nltk.download('stopwords')
@@ -49,15 +50,9 @@ FROM "stage"."PRODATA_IT_TEXTO"
 
 dados = pd.read_sql(query, conn)
 
-# Vetorização dos textos usando TF-IDF
-for i, reg in dados.iterrows():
-    dados.at[i,'TEXTO'] = re.sub(r'\W', ' ', reg['TEXTO'])
-    dados.at[i,'TEXTO'] = re.sub(r'\s+[a-zA-Z]\s+', ' ', reg['TEXTO'])
-    dados.at[i,'TEXTO'] = re.sub(r'\^[a-zA-Z]\s+', ' ', reg['TEXTO'])
-    dados.at[i,'TEXTO'] = re.sub(r'\s+', ' ', reg['TEXTO'], flags=re.I)
-    dados.at[i,'TEXTO'] = re.sub(r'^b\s+', '', reg['TEXTO'])
-    dados.at[i,'TEXTO'] = re.sub(r'^(.*)SOLICITANTE', '', reg['TEXTO'], flags=re.I)
-    dados.at[i,'TEXTO'] = reg['TEXTO'].lower()
+# Limpeza dos textos usando expressões regulares
+dados['TEXTO'] = dados['TEXTO'].str.replace(r'\W|\s+[a-zA-Z]\s+|\^[a-zA-Z]\s+', ' ', regex=True)
+dados['TEXTO'] = dados['TEXTO'].str.replace(r'^(.*)SOLICITANTE', '', flags=re.I, regex=True).str.lower()
 
 tfidf_vectorizer = TfidfVectorizer(stop_words=stopwords.words('portuguese'))
 tfidf_matrix = tfidf_vectorizer.fit_transform(dados['TEXTO'])
@@ -69,13 +64,10 @@ cosine_sim = cosine_similarity(tfidf_matrix)
 #similarity_df = pd.DataFrame(cosine_sim, columns=dados['DOCUMENTO'], index=dados['DOCUMENTO'])
 
 s = []
-
 for i in range(len(cosine_sim)):
     for j in range(i + 1, len(cosine_sim)):
-        if cosine_sim[i, j] > 0.5 and i != j:  # Limite de similaridade (ajustável)
-            s.append({'IT1': dados['DOCUMENTO'][i]
-                     , 'IT2': dados['DOCUMENTO'][j]
-                     , 'GS': cosine_sim[i, j]})
+        if cosine_sim[i, j] > 0.5 and i != j:
+            s.append({'IT1': dados['DOCUMENTO'][i], 'IT2': dados['DOCUMENTO'][j], 'GS': cosine_sim[i, j]})
 #            print(f"Alta similaridade entre '{dados['DOCUMENTO'][i]}' e '{dados['DOCUMENTO'][j]}': {cosine_sim[i, j]:.2f}")
 
 #pd.DataFrame(s).to_csv('F:\\temp\\similarity_df.csv', index=False)
@@ -91,24 +83,16 @@ for i in range(len(cosine_sim)):
 #print(dados[['DOCUMENTO', 'ORIGEM', 'GRUPO']])
 
 ###### LIMPA stage."IT_SIMILAR" e insere as previsões
-
 truncate_query = 'truncate table stage."IT_SIMILAR"'
-
-# Execute the command
 cursor.execute(truncate_query)
 
-# Insert DataFrame rows one by one
-for i,row in pd.DataFrame(s).iterrows():
-    qins = ('''
-            INSERT INTO stage."IT_SIMILAR"
-            ("ITCN_DK_1", "ITCN_DK_2", "GS")
-            VALUES(%i, %i, %f);
-        '''
-            % (row['IT1']
-           , row['IT2']
-           , row['GS']
-        ))
-    cursor.execute(qins)
+# Inserção em lote dos resultados
+insert_query = '''
+    INSERT INTO stage."IT_SIMILAR" ("ITCN_DK_1", "ITCN_DK_2", "GS")
+    VALUES %s
+'''
+values = [(row['IT1'], row['IT2'], row['GS']) for row in s]
+execute_values(cursor, insert_query, values)
 
 # Close the cursor and connection
 cursor.close()
