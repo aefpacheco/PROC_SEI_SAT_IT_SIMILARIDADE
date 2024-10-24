@@ -1,15 +1,12 @@
 import psycopg2
 import pandas as pd
-#from datetime import datetime, timedelta
-#import numpy as np
 import re
 import nltk
-#import pickle
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import KMeans
 from psycopg2.extras import execute_values
-#from sklearn.cluster import AgglomerativeClustering
 
 nltk.download('stopwords')
 
@@ -18,7 +15,7 @@ conn = psycopg2.connect(
     database="gate",
     user="gate",
     password="gatehom2020",
-    port="5432"  # Default PostgreSQL port
+    port="5432"
 )
 
 conn.autocommit = True
@@ -29,23 +26,8 @@ query = '''
 SELECT
   "ITCN_DK" "DOCUMENTO"
 , "TEXTO"
---, 'IT' "ORIGEM"
 FROM "stage"."PRODATA_IT_TEXTO"
---union
---SELECT
---  'DESP'||to_char("ID_DOCUMENTO", 'fm000000000000')  "DOCUMENTO"
---, "DESPACHO" "TEXTO"
---, 'DESPACHO' "ORIGEM"
---FROM "stage"."SEI_SAT_DSPCH"
---union
---SELECT
---  'SAT'||to_char("ID_DOCUMENTO", 'fm000000000000')  "DOCUMENTO"
---, "DUVIDA" "TEXTO"
---, 'SAT' "ORIGEM"
---FROM "stage"."SEI_SATs"
---where "DUVIDA" is not null
---  and (btrim("DUVIDA", ' ') <> '' or btrim("DUVIDA", ' ') is not null)
---limit 100;
+--limit 1000;
 '''
 
 dados = pd.read_sql(query, conn)
@@ -57,41 +39,29 @@ dados['TEXTO'] = dados['TEXTO'].str.replace(r'^(.*)SOLICITANTE', '', flags=re.I,
 tfidf_vectorizer = TfidfVectorizer(stop_words=stopwords.words('portuguese'))
 tfidf_matrix = tfidf_vectorizer.fit_transform(dados['TEXTO'])
 
+# Aplicar o KMeans para clusterização dos documentos
+num_clusters = 50  # Defina o número de clusters desejado
+kmeans_model = KMeans(n_clusters=num_clusters, random_state=42)
+dados['CLUSTER'] = kmeans_model.fit_predict(tfidf_matrix)
+
 # Calcular a similaridade do cosseno
 cosine_sim = cosine_similarity(tfidf_matrix)
-
-# Exibir a matriz de similaridade (opcional)
-#similarity_df = pd.DataFrame(cosine_sim, columns=dados['DOCUMENTO'], index=dados['DOCUMENTO'])
 
 s = []
 for i in range(len(cosine_sim)):
     for j in range(i + 1, len(cosine_sim)):
         if cosine_sim[i, j] > 0.5 and i != j:
             s.append({'IT1': dados['DOCUMENTO'][i], 'IT2': dados['DOCUMENTO'][j], 'GS': cosine_sim[i, j]})
-#            print(f"Alta similaridade entre '{dados['DOCUMENTO'][i]}' e '{dados['DOCUMENTO'][j]}': {cosine_sim[i, j]:.2f}")
 
-#pd.DataFrame(s).to_csv('F:\\temp\\similarity_df.csv', index=False)
-
-# Clustering dos documentos com base na similaridade (por exemplo, aglomerativo)
-#clustering_model = AgglomerativeClustering(n_clusters=None, metric='cosine', linkage='average', distance_threshold=0.3)
-#labels = clustering_model.fit_predict(1 - cosine_sim)
-
-# Adicionar os rótulos de grupo ao DataFrame original
-#dados['GRUPO'] = labels
-
-# Exibir os documentos agrupados
-#print(dados[['DOCUMENTO', 'ORIGEM', 'GRUPO']])
-
-###### LIMPA stage."IT_SIMILAR" e insere as previsões
 truncate_query = 'truncate table stage."IT_SIMILAR"'
 cursor.execute(truncate_query)
 
 # Inserção em lote dos resultados
 insert_query = '''
-    INSERT INTO stage."IT_SIMILAR" ("ITCN_DK_1", "ITCN_DK_2", "GS")
+    INSERT INTO stage."IT_SIMILAR" ("ITCN_DK_1", "ITCN_DK_2", "GS", "CLUSTER")
     VALUES %s
 '''
-values = [(row['IT1'], row['IT2'], row['GS']) for row in s]
+values = [(row['IT1'], row['IT2'], row['GS'],row['CLUSTER']) for row in s]
 execute_values(cursor, insert_query, values)
 
 # Close the cursor and connection
