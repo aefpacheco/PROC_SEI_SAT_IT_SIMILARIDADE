@@ -55,7 +55,7 @@ s = []
 for i in range(len(cosine_sim)):
     for j in range(i + 1, len(cosine_sim)):
         if cosine_sim[i, j] > 0.5 and i != j:
-            s.append({'IT1': dados['DOCUMENTO'][i], 'IT2': dados['DOCUMENTO'][j], 'GS': cosine_sim[i, j], 'CLUSTER': dados['CLUSTER']})
+            s.append({'IT1': dados['DOCUMENTO'][i], 'IT2': dados['DOCUMENTO'][j], 'GS': cosine_sim[i, j], 'CLUSTER': dados['CLUSTER'][i]})
 
 truncate_query = 'truncate table stage."IT_SIMILAR"'
 cursor.execute(truncate_query)
