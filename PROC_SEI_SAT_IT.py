@@ -27,7 +27,7 @@ SELECT
   "ITCN_DK" "DOCUMENTO"
 , "TEXTO"
 FROM "stage"."PRODATA_IT_TEXTO"
---limit 1000;
+--limit 100;
 '''
 
 dados = pd.read_sql(query, conn)
@@ -44,7 +44,7 @@ tfidf_vectorizer = TfidfVectorizer(stop_words=stopwords.words('portuguese'))
 tfidf_matrix = tfidf_vectorizer.fit_transform(dados['TEXTO'])
 
 # Aplicar o KMeans para clusterização dos documentos
-num_clusters = 50  # Defina o número de clusters desejado
+num_clusters = 12  # Defina o número de clusters desejado
 kmeans_model = KMeans(n_clusters=num_clusters, random_state=42)
 dados['CLUSTER'] = kmeans_model.fit_predict(tfidf_matrix)
 
@@ -55,17 +55,21 @@ s = []
 for i in range(len(cosine_sim)):
     for j in range(i + 1, len(cosine_sim)):
         if cosine_sim[i, j] > 0.5 and i != j:
-            s.append({'IT1': dados['DOCUMENTO'][i], 'IT2': dados['DOCUMENTO'][j], 'GS': cosine_sim[i, j], 'CLUSTER': dados['CLUSTER'][i]})
+            s.append({'IT1': dados['DOCUMENTO'][i]
+                         , 'IT2': dados['DOCUMENTO'][j]
+                         , 'GS': cosine_sim[i, j]
+                         , 'CLUSTER1': dados['CLUSTER'][i]
+                         , 'CLUSTER2': dados['CLUSTER'][j]
+                      })
 
-truncate_query = 'truncate table stage."IT_SIMILAR"'
-cursor.execute(truncate_query)
+cursor.execute('truncate table stage."IT_SIMILAR"')
 
 # Inserção em lote dos resultados
 insert_query = '''
-    INSERT INTO stage."IT_SIMILAR" ("ITCN_DK_1", "ITCN_DK_2", "GS", "CLUSTER")
+    INSERT INTO stage."IT_SIMILAR" ("ITCN_DK_1", "ITCN_DK_2", "GS", "CLUSTER1", "CLUSTER2")
     VALUES %s
 '''
-values = [(row['IT1'], row['IT2'], row['GS'],row['CLUSTER']) for row in s]
+values = [(float(row['IT1']), float(row['IT2']), float(row['GS']), int(row['CLUSTER1']), int(row['CLUSTER2'])) for row in s]
 execute_values(cursor, insert_query, values)
 
 # Close the cursor and connection
