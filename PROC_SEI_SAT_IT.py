@@ -4,8 +4,10 @@ import re
 import nltk
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
+#from sklearn.metrics import silhouette_score
+#import matplotlib.pyplot as plt
 from psycopg2.extras import execute_values
 
 nltk.download('stopwords')
@@ -43,8 +45,26 @@ dados['TEXTO'] = dados['TEXTO'].str.replace(r'^(.*)SOLICITANTE', '', regex=True,
 tfidf_vectorizer = TfidfVectorizer(stop_words=stopwords.words('portuguese'))
 tfidf_matrix = tfidf_vectorizer.fit_transform(dados['TEXTO'])
 
+# Calcular o Coeficiente de Silhueta para diferentes quantidades de clusters
+#sil_scores = []
+#
+#for k in range(2, 50):  # Silhouette Score não é definido para k=1
+#    kmeans = KMeans(n_clusters=k, random_state=42)
+#    labels = kmeans.fit_predict(tfidf_matrix)
+#    sil_score = silhouette_score(tfidf_matrix, labels)
+#    sil_scores.append(sil_score)
+#
+## Plotar o gráfico do Coeficiente de Silhueta
+#plt.figure(figsize=(6, 4))
+#plt.plot(range(2, 50), sil_scores, marker='o')
+#plt.title('Coeficiente de Silhueta para Diferentes Números de Clusters')
+#plt.xlabel('Número de Clusters')
+#plt.ylabel('Coeficiente de Silhueta')
+#plt.grid(True)
+#plt.show()
+
 # Aplicar o KMeans para clusterização dos documentos
-num_clusters = 12  # Defina o número de clusters desejado
+num_clusters = 44  # Defina o número de clusters desejado
 kmeans_model = KMeans(n_clusters=num_clusters, random_state=42)
 dados['CLUSTER'] = kmeans_model.fit_predict(tfidf_matrix)
 
