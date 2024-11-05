@@ -42,7 +42,7 @@ dados['TEXTO'] = dados['TEXTO'].str.replace(r'\s+[a-z]\s+', ' ', regex=True, fla
 dados['TEXTO'] = dados['TEXTO'].str.replace(r'^[a-z0-9]\s+', '', regex=True, flags=re.I)
 dados['TEXTO'] = dados['TEXTO'].str.replace(r'^(.*)SOLICITANTE', '', regex=True, flags=re.I)
 
-tfidf_vectorizer = TfidfVectorizer(stop_words=stopwords.words('portuguese'))
+tfidf_vectorizer = TfidfVectorizer(stop_words=stopwords.words('portuguese'), ngram_range=(1, 3))
 tfidf_matrix = tfidf_vectorizer.fit_transform(dados['TEXTO'])
 
 # Calcular o Coeficiente de Silhueta para diferentes quantidades de clusters
